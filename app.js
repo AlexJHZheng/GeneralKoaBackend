@@ -7,8 +7,10 @@ const config = require('./config')
 
 const app =new Koa() //项目入口
 
+// 除了这个地址，其他的URL都需要验证
 app.use(koaJWT({ secret: config.secretKey }).unless({ path: [/^\/api/] }))
 
+// 错误处理
 const errFn=async (ctx,next)=>{
     try{
         await next()
@@ -24,6 +26,6 @@ app.use(cors()) //跨域
 app.use(bodyParser()) //解析接口传递body
 app.use(user_router.routes()) //注册路由
 
-app.listen(80,()=>{ //端口
+app.listen(8609,()=>{ //端口
     console.log('服务器启动成功')
 })
