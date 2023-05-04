@@ -27,7 +27,18 @@ exports.register=async ctx=>{
 }
 
 exports.login=async ctx=>{
-    ctx.body='login ok'
+    //获取请求的用户信息，并解析出用户名和密码
+    const userInfo=ctx.request.body
+    const username=userInfo.username
+    const password=userInfo.password
+    //验证
+    userdb.checkUserLogin(username,password).then((res)=>{
+        console.log('查询用户',username)
+        console.log('查询结果',res)
+    })
+    
+
+    ctx.body='res'
 }
 // eu vou caucular 10 vezes 400
 exports.cauculator=async ctx=>{

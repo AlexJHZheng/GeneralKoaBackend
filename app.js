@@ -8,7 +8,7 @@ const config = require('./config')
 const app =new Koa() //项目入口
 
 // 除了这个地址，其他的URL都需要验证
-app.use(koaJWT({ secret: config.secretKey }).unless({ path: [/^\/api/] }))
+app.use(koaJWT({ secret: config.secretKey }).unless({ path: [/^\/api\/(login|refresh)/] }))
 
 // 错误处理
 const errFn=async (ctx,next)=>{

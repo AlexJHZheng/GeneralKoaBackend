@@ -2,7 +2,8 @@ const Router=require('koa-router')
 const api_user=require('../api/user')
 
 const router = new Router({
-    prefix:'/api'  //路由前缀
+    // prefix:'/api'  //路由前缀
+    prefix:'/api'
 })
 
 router.post('/register',api_user.register)

@@ -4,13 +4,13 @@
 const mysql=require('mysql')
 const pool = mysql.createPool({
      //数据库IP
-     host:'mysqltest.cni4lan1q3vs.sa-east-1.rds.amazonaws.com',
+     host:'177.71.131.255',
      //数据库账号
      user:'admin',
      //数据库密码
-     password:'Qq123456',
+     password:'nmYrzEL2GzZyGFw8',
      //数据库名称
-     database:'pixData'
+     database:'pix'
   })
   //返回Promise，使用连接池，连接查询mysql
   const query = function(sql) {
