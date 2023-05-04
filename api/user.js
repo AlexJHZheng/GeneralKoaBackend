@@ -29,3 +29,9 @@ exports.register=async ctx=>{
 exports.login=async ctx=>{
     ctx.body='login ok'
 }
+// eu vou caucular 10 vezes 400
+exports.cauculator=async ctx=>{
+// 计算10乘400 结果放在变量res中
+    let res=10*400
+    ctx.body=res
+}
