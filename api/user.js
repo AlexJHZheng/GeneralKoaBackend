@@ -5,25 +5,36 @@ const config=require('../config')
 
 
 exports.register=async ctx=>{
-    //验证
+    //定义注册接口的验证规则
     const register_schema=Joi.object({
         username:Joi.string().alphanum().min(5).max(12).required(),
         password:Joi.string().pattern(/^[\S]{6,15}$/).required()
     })
+    //获取请求的用户信息，并解析出用户名和密码
     const userInfo=ctx.request.body
+    //验证
     const {error}=register_schema.validate(userInfo)
     if(error){
         return ctx.body={status:1,msg:error.message}
     }
-
-    userdb.checkUserName(userInfo.username).then((res)=>{
+    //验证用户名是否存在
+    await userdb.checkUserName(userInfo.username).then((res)=>{
         console.log('查询用户',userInfo.username)
         console.log('查询结果',res)
+        // res为假表示用户名不存在，进行注册
+        if(!res){
+            userdb.register(userInfo.username,userInfo.password,userInfo.summary).then((res)=>{
+                console.log('注册结果',res)
+                if(res){
+                    ctx.body={status:200,msg:'注册成功'}
+                }else{
+                    ctx.body={status:-1,msg:'注册失败'}
+                }
+            })
+        }else{
+            return ctx.body={status:-1,msg:'user is exited用户名已存在'}
+        }
     })
-
-    const token=jwt.sign({username:userInfo.username},config.secretKey,{expiresIn:'100s'})
-    console.log('token为',token)
-    ctx.body=userInfo
 }
 
 exports.login=async ctx=>{
