@@ -1,3 +1,4 @@
 module.exports={
-	secretKey:'apipix'
+	secretKey:'apipix',
+	refreshKey:'refreshpix'
 }
