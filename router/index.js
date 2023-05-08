@@ -14,9 +14,14 @@ router.post('/login',api_user.login)
 router.put('/addPayFlow',api_pay.addPayFlow)
 // 修改支付流水状态路由
 router.post('/updatePayFlow',api_pay.updatePayStatus)
+// 通过token获取用户信息
+router.get('/getUserInfo',api_user.getUserInfo)
 
+// 通过token刷新token
+router.post('/refreshToken',api_user.refreshToken)
 
-router.get('/cauculator',api_user.cauculator)
+// 核验token和refreshToken是否过期
+router.post('/checkToken',api_user.checkToken)
 
 router.get('/',async ctx=>{
     ctx.body='servece ok'

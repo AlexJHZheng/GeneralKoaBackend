@@ -64,17 +64,82 @@ exports.login=async ctx=>{
     if(result==-1){
         res={status:-1,msg:'用户被禁用'}
     }
+    //获取用户权限,返回结果为数组
+    const roles=await userdb.getUserRoles(username).then((res)=>{
+        return res
+    })
     //result为1返回登录成功
     if(result==1){
-        const token=jwt.sign({username:userInfo.username},config.secretKey,{expiresIn:'24h'})
-        const refreshToken=jwt.sign({username:userInfo.username},config.secretKey,{expiresIn:'30d'})
-        res={status:200,msg:'登录成功',token:token,refreshToken:refreshToken}
+        const token=jwt.sign({username:userInfo.username},config.secretKey,{expiresIn:'3s'})
+        const refreshToken=jwt.sign({username:userInfo.username},config.refreshKey,{expiresIn:'30d'})
+        res={status:200,msg:'登录成功',token:token,refreshToken:refreshToken,name:userInfo.username,roles:[roles]}
     }
     ctx.body=res
 }
-// eu vou caucular 10 vezes 400
-exports.cauculator=async ctx=>{
-// 计算10乘400 结果放在变量res中
-    let res=10*400
-    ctx.body=res
+
+// 通过token获取用户信息
+exports.getUserInfo=async ctx=>{
+    const token=ctx.header.authorization
+    //token不存在则返回token不存在
+    if(!token){
+        return ctx.body={status:-1,msg:'token不存在'}
+    }
+    const userInfo=jwt.decode(token.split(' ')[1],config.secretKey)
+    // 检测token是否过期
+    if(Date.now()>userInfo.exp*1000){
+        return ctx.body={status:200,msg:'token已过期'}
+    }
+    const username=userInfo.username
+    const roles=await userdb.getUserRoles(username).then((res)=>{
+        return res
+    })
+    ctx.body={status:200,msg:'获取用户信息成功',name:username,roles:[roles]}
+}
+
+// 通过refreshToken获取新的token
+exports.refreshToken=async ctx=>{
+    const refreshToken=ctx.request.body.refreshToken
+    //refreshToken不存在则返回refreshToken不存在
+    if(!refreshToken){
+        return ctx.body={status:-1,msg:'refreshToken不存在'}
+    }
+    const userInfo=jwt.decode(refreshToken,config.refreshKey)
+    // 检测refreshToken是否过期
+    if(Date.now()>userInfo.exp*1000){
+        return ctx.body={status:-1,msg:'refreshToken已过期'}
+    }
+    const username=userInfo.username
+    const token=jwt.sign({username:username},config.secretKey,{expiresIn:'3s'})
+    ctx.body={status:200,msg:'获取新的token成功',token:token}
+}
+
+// 接收token和refreshToken
+// 首先检查token是否过期
+// 如果token过期则检查refreshToken是否过期
+// 如果refreshToken过期则返回refreshToken过期则返回tcode=0
+// 如果refreshToken未过期则返回新的token加tcode=2
+// 如果token未过期则返回tcode=1
+exports.checkToken=async ctx=>{
+    const token=ctx.request.body.token
+    //token不存在则返回token不存在
+    const userInfo=jwt.decode(token,config.secretKey)
+    // 如果userInfo为null则表示token不存在
+    // 检测token是否过期或者token不存在
+    if(!userInfo||Date.now()>userInfo.exp*1000 ){
+        const refreshToken=ctx.request.body.refreshToken
+        //refreshToken不存在则返回refreshToken不存在
+        if(!refreshToken){
+            return ctx.body={status:50008,msg:'refreshToken不存在',tokenCode:0}
+        }
+        const userInfo=jwt.decode(refreshToken,config.refreshKey)
+        // 检测refreshToken是否过期
+        if(!userInfo||Date.now()>userInfo.exp*1000){
+            return ctx.body={status:50008,msg:'refreshToken已过期',tokenCode:0}
+        }
+        const username=userInfo.username
+        const token=jwt.sign({username:username},config.secretKey,{expiresIn:'3s'})
+        return ctx.body={status:200,msg:'获取新的token成功',tokenCode:2,token:token}
+    }else{
+        return ctx.body={status:200,msg:'token未过期',tokenCode:1}
+    }
 }

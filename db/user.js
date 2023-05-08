@@ -47,10 +47,21 @@ async function getUserID(user){
     return false
 }
 
+// 获取用户权限
+async function getUserRoles(user){
+    const sql = `select * from User where userName='${user}'`
+    const result = await db(sql)
+    if(result.length>0){
+        return result[0].roles
+    }
+    return false
+}
+
 module.exports={
     checkUserName:checkUserName,
     checkUserLogin:checkUserLogin,
     register:register,
-    getUserID:getUserID
+    getUserID:getUserID,
+    getUserRoles:getUserRoles
 
 }
