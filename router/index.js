@@ -1,11 +1,14 @@
 const Router=require('koa-router')
 const api_user=require('../api/user')
 const api_pay=require('../api/pay')
+const api_weebhook=require('../api/webhook')
 
 const router = new Router({
     // prefix:'/api'  //路由前缀
     prefix:'/api'
 })
+//webhook接口路由
+router.post('/webhook',api_weebhook.webhookReceve)
 // 注册接口路由
 router.post('/register',api_user.register)
 // 登录接口路由
