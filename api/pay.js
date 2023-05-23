@@ -8,9 +8,14 @@ exports.addPayFlow = async ctx => {
     
     // 获取请求的用户信息，并解析出用户名和密码
     const payInfo = ctx.request.body
+    // 订单金额
     const payTotal = payInfo.payTotal
+    // 订单备注
     const payObs = payInfo.payObs
+    // 订单号
     const payNum = payInfo.payNum
+    // 客人名字
+    const payClient = payInfo.payClient
     // payNum不能为空
     if (!payNum) {
         return ctx.body = { status: -3, msg: '订单号不能为空' }
@@ -42,7 +47,7 @@ exports.addPayFlow = async ctx => {
     }
     
     
-    const result = await paydb.addPayFlow(payTotal, userID, payObs,payNum).then((res) => {
+    const result = await paydb.addPayFlow(payTotal, userID, payObs,payNum,payClient).then((res) => {
         return res
     })
     if (result) {

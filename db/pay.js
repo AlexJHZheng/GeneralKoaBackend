@@ -3,8 +3,8 @@ const db=require('../db/index')
 // 数据库PayFlow结构为payTotal,payDate,userID,payStatus,payObs
 // 新增支付流水，时间为当前时间，状态为0
 // 传入数据为payTotal,userID,payObs
-async function addPayFlow(payTotal,userID,payObs,payNum){
-    const sql = `insert into PayFlow(payTotal,payDate,userID,payStatus,payObs,payNum) values('${payTotal}',now(),'${userID}',0,'${payObs}',${payNum})`
+async function addPayFlow(payTotal,userID,payObs,payNum,payClient){
+    const sql = `insert into PayFlow(payTotal,payDate,userID,payStatus,payObs,payNum,payClient) values('${payTotal}',now(),'${userID}',0,'${payObs}','${payNum}','${payClient}')`
     const result = await db(sql)
     if(result.affectedRows>0){
         return true
