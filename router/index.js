@@ -30,7 +30,7 @@ router.post('/checkToken',api_user.checkToken)
 router.get('/getPayFlowList',api_pay.getPayFlowList)
 
 router.get('/',async ctx=>{
-    ctx.body='servece ok'
+    ctx.body='servece ok 182555'
 })
 
 

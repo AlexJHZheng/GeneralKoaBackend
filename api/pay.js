@@ -2,6 +2,7 @@ const paydb = require('../db/pay')
 const userdb = require('../db/user')
 const jwt = require('jsonwebtoken') //token生成模块
 const config=require('../config') //配置文件
+const axios = require('axios') //axios模块
 
 // 新增支付流水
 exports.addPayFlow = async ctx => {
@@ -49,7 +50,16 @@ exports.addPayFlow = async ctx => {
     const pix_path = 'kk6g232xel65a0daee4dd13kk471542221'
     // pix_copy 二维码信息文件
     // pix_wallet 二维码图片地址
-
+    try {
+        // 调用接口获取数据
+        const response = await axios.get('http://201.93.162.198:8609/api');
+        const data = response.data;
+        console.log(data,'接口调用成功');
+      } catch (error) {
+        // 处理错误情况
+        console.log(error,'接口调用失败');
+        console.error('Error:', error);
+      }
 
 
 
