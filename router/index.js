@@ -26,6 +26,9 @@ router.post('/refreshToken',api_user.refreshToken)
 // 核验token和refreshToken是否过期
 router.post('/checkToken',api_user.checkToken)
 
+// 获取支付流水列表
+router.get('/getPayFlowList',api_pay.getPayFlowList)
+
 router.get('/',async ctx=>{
     ctx.body='servece ok'
 })
