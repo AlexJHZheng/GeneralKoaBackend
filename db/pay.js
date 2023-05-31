@@ -35,74 +35,52 @@ async function updatePayStatus(payNum,payStatus){
 }
 // 通过传入的用户权限(admin,editot)和用户ID来获取订单列表，如果是admin则获取所有订单，如果是editor则获取该用户的订单
 // 传入数据为userRole,userID
-async function getPayList(userRole,userID,startTime,endTime){
+async function getPayList(userRole,userID,startTime,endTime,currentPage, pageSize){
     // 如果startTime和endTime存在，则查询时间段内的订单，如果不存在，则查询所有订单
     // 查询要联合User表获取summary信息,其中User表中ID和payFlow表中的userID相同
     // 如果是admin，则查询所有订单
     // 如果是editor，则查询该用户的订单
     // 查询结果取 PayFlow中的payNum,payTotal,payDate,payStatus,payObs,payClient,pix_path,payTotalReceved和User中的username,summary
     let sql = ''
-    if(userRole=='admin'){
-        if(startTime&&endTime){
-            sql = `
-      SELECT PayFlow.payNum, PayFlow.payTotal, PayFlow.payDate, PayFlow.payStatus, PayFlow.payObs,
-      PayFlow.payClient, PayFlow.pix_path, PayFlow.payTotalReceved, User.username, User.summary
-      FROM PayFlow
-      LEFT JOIN User ON PayFlow.userID = User.ID
-      WHERE PayFlow.payDate BETWEEN '${startTime}' AND '${endTime}'
-      ORDER BY PayFlow.payDate ASC
-    `
-        }else{
-            sql = `
-      SELECT PayFlow.payNum, PayFlow.payTotal, PayFlow.payDate, PayFlow.payStatus, PayFlow.payObs,
-      PayFlow.payClient, PayFlow.pix_path, PayFlow.payTotalReceved, User.username, User.summary
-      FROM PayFlow
-      LEFT JOIN User ON PayFlow.userID = User.ID
-      ORDER BY PayFlow.payDate ASC
-    `
-        }
-    }else if(userRole=='editor'){
-        if(startTime&&endTime){
-            sql = `
-      SELECT PayFlow.payNum, PayFlow.payTotal, PayFlow.payDate, PayFlow.payStatus, PayFlow.payObs,
-      PayFlow.payClient, PayFlow.pix_path, PayFlow.payTotalReceved, User.username, User.summary
-      FROM PayFlow
-      LEFT JOIN User ON PayFlow.userID = User.ID
-      WHERE PayFlow.payDate BETWEEN '${startTime}' AND '${endTime}' AND PayFlow.userID = '${userID}'
-      ORDER BY PayFlow.payDate ASC
-    `
-        }else{
-            sql = `
-      SELECT PayFlow.payNum, PayFlow.payTotal, PayFlow.payDate, PayFlow.payStatus, PayFlow.payObs,
-      PayFlow.payClient, PayFlow.pix_path, PayFlow.payTotalReceved, User.username, User.summary
-      FROM PayFlow
-      LEFT JOIN User ON PayFlow.userID = User.ID
-      WHERE PayFlow.userID = '${userID}'
-      ORDER BY PayFlow.payDate ASC
-    `
-        }
+    let countSql = ''
+  let conditions = ''
+  if (userRole === 'admin') {
+    if (startTime && endTime) {
+      conditions = `WHERE PayFlow.payDate BETWEEN '${startTime}' AND '${endTime}'`;
     }
-    const result = await db(sql)
-    if(result.length>0){
-        return result
+  } else if (userRole === 'editor') {
+    if (startTime && endTime) {
+      conditions = `WHERE PayFlow.payDate BETWEEN '${startTime}' AND '${endTime}' AND PayFlow.userID = '${userID}'`;
+    } else {
+      conditions = `WHERE PayFlow.userID = '${userID}'`;
     }
-    return false
-    // 之前的代码
+  }
+  sql = `
+  SELECT PayFlow.payNum, PayFlow.payTotal, PayFlow.payDate, PayFlow.payStatus, PayFlow.payObs,
+  PayFlow.payClient, PayFlow.pix_path, PayFlow.payTotalReceved, User.username, User.summary
+  FROM PayFlow
+  LEFT JOIN User ON PayFlow.userID = User.ID
+  ${conditions}
+  ORDER BY PayFlow.payDate ASC
+  LIMIT ${(currentPage - 1) * pageSize}, ${pageSize}
+`
+countSql = `
+    SELECT COUNT(*) AS total
+    FROM PayFlow
+    LEFT JOIN User ON PayFlow.userID = User.ID
+    ${conditions}
+  `
 
+  const [result, countResult] = await Promise.all([db(sql), db(countSql)]);
+  const totalCount = countResult[0].total;
 
+  return {
+    data: result,
+    total: totalCount,
+    currentPage: currentPage,
+    pageSize: pageSize,
+  }
 
-
-    // let sql = ''
-    // if(userRole=='admin'){
-    //     sql = `select * from PayFlow`
-    // }else if(userRole=='editor'){
-    //     sql = `select * from PayFlow where userID='${userID}'`
-    // }
-    // const result = await db(sql)
-    // if(result.length>0){
-    //     return result
-    // }
-    // return false
 }
 
 
