@@ -6,7 +6,9 @@ const axios = require('axios') //axios模块
 
 // 新增支付流水
 exports.addPayFlow = async ctx => {
-    console.log(ctx.request.body,'请求')
+    //计时开始
+    const startTime = new Date();
+    // console.log(ctx.request.body,'请求')
     // 获取请求的用户信息，并解析出用户名和密码
     const payInfo = ctx.request.body
     // 订单金额
@@ -55,6 +57,13 @@ exports.addPayFlow = async ctx => {
     let pix_copy=''
     let pix_wallet=''
     // pix_wallet 二维码图片地址
+    const parts = payTotal.toString().split('.');
+    const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    const decimalPart = parts[1] ? parts[1] : '00';
+    var payBrasil=`${integerPart},${decimalPart}`
+    const endTime = new Date();
+    const elapsedTimeInSeconds = (endTime - startTime) / 1000;
+    console.log(`接口运行时间1：${elapsedTimeInSeconds} 秒`);
     try {
         const postData = {
             token_api: 'MhbdYZ0X0JRhFJfJtob9kvr45kzQxQMZdgIUYTnytQcRE2hEJ4vsxmI4nqWEAEAgs5dtzfYGmmQhupQ8BzyDsoRk6SZ9TXE3BdH273p8QDEWhul7kk7ztwm5tOv75BVr',
@@ -62,31 +71,44 @@ exports.addPayFlow = async ctx => {
             document : '38782887861',
             email : 'suporte@suprem.cash',
             description : payNum,
-            amount : payTotal,
+            amount : payBrasil,
             expiration : expiration,
           }
+          const endTime = new Date();
+          const elapsedTimeInSeconds = (endTime - startTime) / 1000;
+          console.log(`接口运行时间2：${elapsedTimeInSeconds} 秒`);
         // 调用接口获取数据
         const response = await axios.post('https://api.suprem.cash/pix/collection/wallet',postData);
         const data = response.data;
-        pix_path=data.pix_path
-        pix_copy=data.pix_copy
-        pix_wallet=data.pix_wallet
+        pix_path=data.info.pix_path
+        pix_copy=data.info.pix_copy
+        pix_wallet=data.info.pix_wallet
+        if(data.success){
+            const endTime = new Date();
+            const elapsedTimeInSeconds = (endTime - startTime) / 1000;
+            console.log(`接口运行时间3：${elapsedTimeInSeconds} 秒`);
 
-        console.log(data,'接口调用成功');
+            console.log(data,'接口调用成功')
+            const result = await paydb.addPayFlow(payTotal, userID, payObs,payNum,payClient,pix_path).then((res) => {
+                return res
+            })
+            if (result) {
+                const endTime = new Date();
+                const elapsedTimeInSeconds = (endTime - startTime) / 1000;
+                console.log(`接口运行时间4：${elapsedTimeInSeconds} 秒`);
+                return ctx.body = { status: 200, msg: '支付流水新增成功' ,data:{pix_path,pix_copy,pix_wallet} }
+            } else {
+                return ctx.body = { status: -5, msg: '支付流水新增失败' }
+            }
+        }
+        
       } catch (error) {
         // 处理错误情况
         console.log(error,'接口调用失败');
-        console.error('Error:', error);
+        return ctx.body = { status: -6, msg: '支付流水新增失败' }
+        // console.error('Error:', error);
       }
 
-    const result = await paydb.addPayFlow(payTotal, userID, payObs,payNum,payClient,pix_path).then((res) => {
-        return res
-    })
-    if (result) {
-        return ctx.body = { status: 200, msg: '支付流水新增成功' ,data:{pix_path,pix_copy,pix_wallet} }
-    } else {
-        return ctx.body = { status: -5, msg: '支付流水新增失败' }
-    }
 }
 
 // 修改支付流水状态
@@ -111,6 +133,45 @@ exports.updatePayStatus = async ctx => {
         return ctx.body = { status: 200, msg: '支付流水状态修改成功' }
     } else {
         return ctx.body = { status: -3, msg: '支付流水状态修改失败' }
+    }
+}
+
+// 查询支付状态
+exports.getPayStatus = async ctx => {
+    const pix_path = ctx.request.body.pix_path
+    const postData = {
+        token_api: 'MhbdYZ0X0JRhFJfJtob9kvr45kzQxQMZdgIUYTnytQcRE2hEJ4vsxmI4nqWEAEAgs5dtzfYGmmQhupQ8BzyDsoRk6SZ9TXE3BdH273p8QDEWhul7kk7ztwm5tOv75BVr',
+        pix_path : pix_path
+      }
+    try {
+        const response = await axios.post('https://api.suprem.cash/pix/collection/info',postData)
+        const data = response.data;
+        if(data.success){
+            // 检查status是否更新
+            if(data.info.status==0){
+                // 返回付款成功
+                const amount_pay=data.info.amount_pay
+                paydb.updatePayStatus(pix_path,0,amount_pay)
+                return ctx.body = { status: 200, msg: '付款已成功',data:data.info}}
+            }else if(data.info.status==1){
+                // 查询是否超时
+                const pix_expiration=data.info.pix_expiration
+                //转换成时间模式
+                const expirationDate = new Date(pix_expiration);
+                // 获取当前时间
+                const nowTime = new Date();
+                if(nowTime>expirationDate){
+                    // 超时
+                    return ctx.body = { status: -1, msg: '二维码已失效'}
+                }else{
+                    // 未超时
+                    return ctx.body = { status: 200, msg: '查询成功',data:data.info }
+                }
+            }else{
+                return ctx.body = { status: -2, msg: '查询失败'}}
+            }catch (error) {
+        console.log(error,'接口调用失败');
+        return ctx.body = { status: -3, msg: '查询失败' }
     }
 }
 
@@ -163,3 +224,4 @@ exports.getPayFlowList = async ctx => {
         return ctx.body = { status: -1, msg: '支付流水列表获取失败' }
     }
 }
+

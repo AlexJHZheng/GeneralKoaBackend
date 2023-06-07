@@ -24,9 +24,10 @@ async function checkPayNum(payNum){
 }
 
 // 更新支付流水状态
-async function updatePayStatus(payNum,payStatus){
-    console.log(payNum,payStatus)
-    const sql = `update PayFlow set payStatus='${payStatus}' where payNum='${payNum}'`
+async function updatePayStatus(pix_path,payStatus,payClient){
+    // console.log(payNum,payStatus)
+    const sql =`update PayFlow set payStatus='${payStatus}',payTotalReceved='${payClient}' where pix_path='${pix_path}'`
+    // const sql = `update PayFlow set payStatus='${payStatus}' where payNum='${payNum}'`
     const result = await db(sql)
     if(result.affectedRows>0){
         return true
