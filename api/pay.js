@@ -89,7 +89,7 @@ exports.addPayFlow = async ctx => {
             console.log(`接口运行时间3：${elapsedTimeInSeconds} 秒`);
 
             console.log(data,'接口调用成功')
-            const result = await paydb.addPayFlow(payTotal, userID, payObs,payNum,payClient,pix_path).then((res) => {
+            const result = await paydb.addPayFlow(payTotal, userID, payObs,payNum,payClient,pix_path,expiration).then((res) => {
                 return res
             })
             if (result) {
@@ -139,6 +139,14 @@ exports.updatePayStatus = async ctx => {
 // 查询支付状态
 exports.getPayStatus = async ctx => {
     const pix_path = ctx.request.body.pix_path
+    // 调用db中的checkExpDate方法，检查是否过期
+    const exp=await paydb.checkExpDate(pix_path)
+    // exp 0订单不存在 1.订单未过期 2.订单已过期
+    console.log(exp,'检验checkExpDate方法')
+    // 如果订单不存在
+    if(exp==0){
+        return ctx.body = { status: -1,  msg: '订单不存在'}
+    }
     const postData = {
         token_api: 'MhbdYZ0X0JRhFJfJtob9kvr45kzQxQMZdgIUYTnytQcRE2hEJ4vsxmI4nqWEAEAgs5dtzfYGmmQhupQ8BzyDsoRk6SZ9TXE3BdH273p8QDEWhul7kk7ztwm5tOv75BVr',
         pix_path : pix_path
@@ -152,24 +160,33 @@ exports.getPayStatus = async ctx => {
                 // 返回付款成功
                 const amount_pay=data.info.amount_pay
                 paydb.updatePayStatus(pix_path,0,amount_pay)
-                return ctx.body = { status: 200, msg: '付款已成功',data:data.info}}
+                return ctx.body = { status: 200, success:false ,code:200,  msg: '付款已成功',data:data.info}
             }else if(data.info.status==1){
-                // 查询是否超时
-                const pix_expiration=data.info.pix_expiration
-                //转换成时间模式
-                const expirationDate = new Date(pix_expiration);
-                // 获取当前时间
-                const nowTime = new Date();
-                if(nowTime>expirationDate){
-                    // 超时
-                    return ctx.body = { status: -1, msg: '二维码已失效'}
+                if(exp==2){
+                    // 订单已过期
+                    paydb.updatePayStatus(pix_path,3,0)
+                    return ctx.body = { status: 200, success:false ,code:-1, msg: '二维码已失效'}
                 }else{
-                    // 未超时
-                    return ctx.body = { status: 200, msg: '查询成功',data:data.info }
+                    // 待付款状态，并且未过期
+                    return ctx.body = { status: 200, success:true ,code:200,  msg: '查询成功',data:data.info }
                 }
+            }else if(data.info.status==2){
+                //部分付款
+                paydb.updatePayStatus(pix_path,data.info.status,amount_pay)
+                return ctx.body = {  status: 200, success:false ,code:-2, msg: '仅部分付款，请联系客服'}
+            }else if(data.info.status==3){
+                //cancelado
+                paydb.updatePayStatus(pix_path,data.info.status,amount_pay)
+                return ctx.body = {  status: 200, success:false ,code:-3, msg: '订单已取消'}
+            }else if(data.info.status==4){
+                //已退款
+                paydb.updatePayStatus(pix_path,data.info.status,amount_pay)
+                return ctx.body = {  status: 200, success:false ,code:-4, msg: '订单已退款'}
             }else{
-                return ctx.body = { status: -2, msg: '查询失败'}}
-            }catch (error) {
+                return ctx.body = { status: -2, msg: '查询失败'}
+            }
+        }
+    }catch (error) {
         console.log(error,'接口调用失败');
         return ctx.body = { status: -3, msg: '查询失败' }
     }
