@@ -1,4 +1,6 @@
 //数据库连接模块
+//导入环境变量
+require("dotenv").config();
 
 //导入mysql模块
 const mysql = require("mysql");
