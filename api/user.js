@@ -7,7 +7,7 @@ const config = require("../config");
 const BBapi = require("../api/BBapi");
 
 exports.register = async (ctx) => {
-  BBapi.getBB();
+  // BBapi.getBB();
   //定义注册接口的验证规则
   const register_schema = Joi.object({
     username: Joi.string().alphanum().min(5).max(12).required(),
@@ -23,27 +23,7 @@ exports.register = async (ctx) => {
     return (ctx.body = { status: 1, msg: result.error.message });
   }
   //验证用户名是否存在
-  //   await userdb.checkUserName(userInfo.username).then(async (res) => {
-  //     console.log("查询用户", userInfo.username);
-  //     console.log("查询结果", res);
-  // res为假表示用户名不存在，进行注册
-  // if (!res) {
-  //   userdb
-  //     .register(userInfo.username, userInfo.password, userInfo.summary)
-  //     .then((res) => {
-  //       console.log("注册结果", res);
-  //       if (res) {
-  //         console.log("aqui");
-  //         ctx.body = { status: 200, msg: "user cadastrado" };
-  //         console.log(ctx);
-  //         return ctx.body;
-  //       } else {
-  //         return (ctx.body = { status: -1, msg: "注册失败" });
-  //       }
-  //     });
-  // }
   const checkUser = await userdb.checkUserName(userInfo.username);
-  console.log("checkUser", checkUser);
   if (!checkUser) {
     const regUser = await userdb.register(
       userInfo.username,
@@ -61,6 +41,7 @@ exports.register = async (ctx) => {
   }
 };
 
+//登录接口
 exports.login = async (ctx) => {
   //获取请求的用户信息，并解析出用户名和密码
   const userInfo = ctx.request.body;

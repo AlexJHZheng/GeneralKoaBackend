@@ -16,7 +16,6 @@ async function updateToken(data) {
 async function getToken() {
   const sql = `select * from AcessToken`;
   const result = await db(sql);
-  console.log(result[0]);
   return result[0];
 }
 

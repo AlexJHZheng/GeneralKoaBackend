@@ -3,24 +3,20 @@ const userdb = require("../db/user");
 const jwt = require("jsonwebtoken"); //token生成模块
 const config = require("../config"); //配置文件
 const axios = require("axios"); //axios模块
+const BBapi = require("../api/BBapi");
+const pay = require("../db/pay");
 
 // 新增支付流水
 exports.addPayFlow = async (ctx) => {
   //计时开始
   const startTime = new Date();
-  // console.log(ctx.request.body,'请求')
   // 获取请求的用户信息，并解析出用户名和密码
   const payInfo = ctx.request.body;
-  // 订单金额
-  const payTotal = payInfo.payTotal;
-  // 订单备注
-  const payObs = payInfo.payObs;
-  // 订单号
-  const payNum = payInfo.payNum;
-  // 客人名字
-  const payClient = payInfo.payClient;
-  // 过期时间-分钟
-  const expiration = payInfo.expiration;
+  const payTotal = payInfo.payTotal; // 订单金额
+  const payObs = payInfo.payObs; // 订单备注
+  const payNum = payInfo.payNum; // 订单号
+  const payClient = payInfo.payClient; // 客人名字
+  const expiration = payInfo.expiration; // 过期时间-分钟
   // payNum不能为空
   if (!payNum) {
     return (ctx.body = { status: -3, msg: "订单号不能为空" });
@@ -30,7 +26,6 @@ exports.addPayFlow = async (ctx) => {
   if (payNumExist) {
     return (ctx.body = { status: -4, msg: "订单号已存在" });
   }
-
   // 获取token
   const token = ctx.header.authorization;
   // 截取掉Bearer和空格
@@ -51,80 +46,51 @@ exports.addPayFlow = async (ctx) => {
     return (ctx.body = { status: -2, msg: "用户ID不能为空" });
   }
   // 向银行请求支付，获取二维码链接和支付订单号
-  // pix_path 订单号
-  // const pix_path = 'kk6g232xel65a0daee4dd13kk471542221'
-  // pix_copy 二维码信息文件
-  let pix_path = "";
-  let pix_copy = "";
-  let pix_wallet = "";
-  // pix_wallet 二维码图片地址
+  let pix_path = ""; //订单号
+  let pix_copy = ""; //二维码信息文件
   const parts = payTotal.toString().split(".");
   const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const decimalPart = parts[1] ? parts[1] : "00";
   var payBrasil = `${integerPart},${decimalPart}`;
   const endTime = new Date();
   const elapsedTimeInSeconds = (endTime - startTime) / 1000;
-  console.log(`接口运行时间1：${elapsedTimeInSeconds} 秒`);
-  try {
-    const postData = {
-      token_api:
-        "MhbdYZ0X0JRhFJfJtob9kvr45kzQxQMZdgIUYTnytQcRE2hEJ4vsxmI4nqWEAEAgs5dtzfYGmmQhupQ8BzyDsoRk6SZ9TXE3BdH273p8QDEWhul7kk7ztwm5tOv75BVr",
-      name: "ADRIANA BATISTA E SILVA",
-      document: "38782887861",
-      email: "suporte@suprem.cash",
-      description: payNum,
-      amount: payBrasil,
-      expiration: expiration,
-    };
-    const endTime = new Date();
-    const elapsedTimeInSeconds = (endTime - startTime) / 1000;
-    console.log(`接口运行时间2：${elapsedTimeInSeconds} 秒`);
-    // 调用接口获取数据
-    const response = await axios.post(
-      "https://api.suprem.cash/pix/collection/wallet",
-      postData
-    );
-    const data = response.data;
-    pix_path = data.info.pix_path;
-    pix_copy = data.info.pix_copy;
-    pix_wallet = data.info.pix_wallet;
-    if (data.success) {
-      const endTime = new Date();
-      const elapsedTimeInSeconds = (endTime - startTime) / 1000;
-      console.log(`接口运行时间3：${elapsedTimeInSeconds} 秒`);
 
-      console.log(data, "接口调用成功");
-      const result = await paydb
-        .addPayFlow(
-          payTotal,
-          userID,
-          payObs,
-          payNum,
-          payClient,
-          pix_path,
-          expiration
-        )
-        .then((res) => {
-          return res;
-        });
+  //传入数据调用pixapi接口
+  try {
+    const resultApi = await BBapi.getQRCode(expiration, payTotal, userID);
+    if (resultApi.check) {
+      // 调用成功
+      console.log(resultApi, "接口调用成功");
+      pix_path = resultApi.bankId;
+      pix_copy = resultApi.pixCopiaECola;
+      const bankName = resultApi.bankName;
+      //写入数据库
+      const result = await paydb.addPayFlow(
+        payTotal,
+        userID,
+        payObs,
+        payNum,
+        payClient,
+        pix_path,
+        expiration,
+        bankName
+      );
+      // 判断写入情况
       if (result) {
-        const endTime = new Date();
-        const elapsedTimeInSeconds = (endTime - startTime) / 1000;
-        console.log(`接口运行时间4：${elapsedTimeInSeconds} 秒`);
         return (ctx.body = {
           status: 200,
           msg: "支付流水新增成功",
-          data: { pix_path, pix_copy, pix_wallet },
+          data: { pix_path, pix_copy },
         });
       } else {
         return (ctx.body = { status: -5, msg: "支付流水新增失败" });
       }
+    } else {
+      // 调用失败
+      return (ctx.body = { status: -6, msg: "银行接口调用失败" });
     }
   } catch (error) {
-    // 处理错误情况
-    console.log(error, "接口调用失败");
-    return (ctx.body = { status: -6, msg: "支付流水新增失败" });
-    // console.error('Error:', error);
+    return (ctx.body = { status: -7, msg: "银行接口调用失败" });
   }
 };
 
@@ -164,6 +130,8 @@ exports.getPayStatus = async (ctx) => {
   if (exp == 0) {
     return (ctx.body = { status: -1, msg: "订单不存在" });
   }
+
+  // 调用银行接口查询支付状态
   const postData = {
     token_api:
       "MhbdYZ0X0JRhFJfJtob9kvr45kzQxQMZdgIUYTnytQcRE2hEJ4vsxmI4nqWEAEAgs5dtzfYGmmQhupQ8BzyDsoRk6SZ9TXE3BdH273p8QDEWhul7kk7ztwm5tOv75BVr",
