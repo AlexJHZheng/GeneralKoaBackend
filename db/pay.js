@@ -13,6 +13,7 @@ async function addPayFlow(
   expiration,
   bankName
 ) {
+  console.log(payNum, "payNum2");
   const sql = `insert into PayFlow(payTotal,payDate,userID,payStatus,payObs,payNum,payClient,pix_path,payTotalReceved,recStatus,checkStatus,deleted,expDate,bankName) 
     values('${payTotal}',now(),'${userID}',1,'${payObs}','${payNum}','${payClient}','${pix_path}',0,0,0,0,DATE_ADD(NOW(), INTERVAL ${expiration} MINUTE), '${bankName}')`;
   const result = await db(sql);
@@ -34,9 +35,9 @@ async function checkPayNum(payNum) {
 }
 
 // 更新支付流水状态
-async function updatePayStatus(pix_path, payStatus, payClient) {
+async function updatePayStatus(pix_path, payStatus, payTotalReceved) {
   // console.log(payNum,payStatus)
-  const sql = `UPDATE PayFlow SET payStatus='${payStatus}', payTotalReceved='${payClient}', updateTime=NOW() WHERE pix_path='${pix_path}'`;
+  const sql = `UPDATE PayFlow SET payStatus='${payStatus}', payTotalReceved='${payTotalReceved}', updateTime=NOW() WHERE pix_path='${pix_path}'`;
 
   // const sql = `update PayFlow set payStatus='${payStatus}' where payNum='${payNum}'`
   const result = await db(sql);
@@ -128,7 +129,7 @@ async function checkExpDate(pix_path) {
     const now = Date.now();
     //将数据库中的时间转换为时间戳
     const expDateStamp = new Date(expDate).getTime();
-    //如果过期时间大于当前时间则返回true，否则返回false
+    //未过期1 已过期2
     if (expDateStamp > now) {
       return 1;
     } else {

@@ -15,8 +15,10 @@ exports.addPayFlow = async (ctx) => {
   const payTotal = payInfo.payTotal; // 订单金额
   const payObs = payInfo.payObs; // 订单备注
   const payNum = payInfo.payNum; // 订单号
+  console.log(payNum, "订单号");
   const payClient = payInfo.payClient; // 客人名字
   const expiration = payInfo.expiration; // 过期时间-分钟
+
   // payNum不能为空
   if (!payNum) {
     return (ctx.body = { status: -3, msg: "订单号不能为空" });
@@ -58,6 +60,7 @@ exports.addPayFlow = async (ctx) => {
   //传入数据调用pixapi接口
   try {
     const resultApi = await BBapi.getQRCode(expiration, payTotal, userID);
+    console.log(resultApi, "检查点1");
     if (resultApi.check) {
       // 调用成功
       console.log(resultApi, "接口调用成功");
@@ -90,7 +93,8 @@ exports.addPayFlow = async (ctx) => {
       return (ctx.body = { status: -6, msg: "银行接口调用失败" });
     }
   } catch (error) {
-    return (ctx.body = { status: -7, msg: "银行接口调用失败" });
+    console.log(error, "error");
+    return (ctx.body = { status: -7, msg: "银行接口调用失败", error: error });
   }
 };
 
@@ -122,94 +126,50 @@ exports.updatePayStatus = async (ctx) => {
 // 查询支付状态
 exports.getPayStatus = async (ctx) => {
   const pix_path = ctx.request.body.pix_path;
-  // 调用db中的checkExpDate方法，检查是否过期
-  const exp = await paydb.checkExpDate(pix_path);
-  // exp 0订单不存在 1.订单未过期 2.订单已过期
-  console.log(exp, "检验checkExpDate方法");
-  // 如果订单不存在
-  if (exp == 0) {
-    return (ctx.body = { status: -1, msg: "订单不存在" });
-  }
-
   // 调用银行接口查询支付状态
-  const postData = {
-    token_api:
-      "MhbdYZ0X0JRhFJfJtob9kvr45kzQxQMZdgIUYTnytQcRE2hEJ4vsxmI4nqWEAEAgs5dtzfYGmmQhupQ8BzyDsoRk6SZ9TXE3BdH273p8QDEWhul7kk7ztwm5tOv75BVr",
-    pix_path: pix_path,
-  };
-  try {
-    const response = await axios.post(
-      "https://api.suprem.cash/pix/collection/info",
-      postData
-    );
-    const data = response.data;
-    if (data.success) {
-      // 检查status是否更新
-      if (data.info.status == 0) {
-        // 返回付款成功
-        const amount_pay = data.info.amount_pay;
-        paydb.updatePayStatus(pix_path, 0, amount_pay);
-        return (ctx.body = {
-          status: 200,
-          success: false,
-          code: 200,
-          msg: "付款已成功",
-          data: data.info,
-        });
-      } else if (data.info.status == 1) {
-        if (exp == 2) {
-          // 订单已过期
-          paydb.updatePayStatus(pix_path, 3, 0);
-          return (ctx.body = {
-            status: 200,
-            success: false,
-            code: -1,
-            msg: "二维码已失效",
-          });
-        } else {
-          // 待付款状态，并且未过期
-          return (ctx.body = {
-            status: 200,
-            success: true,
-            code: 200,
-            msg: "查询成功",
-            data: data.info,
-          });
-        }
-      } else if (data.info.status == 2) {
-        //部分付款
-        paydb.updatePayStatus(pix_path, data.info.status, amount_pay);
-        return (ctx.body = {
-          status: 200,
-          success: false,
-          code: -2,
-          msg: "仅部分付款，请联系客服",
-        });
-      } else if (data.info.status == 3) {
-        //cancelado
-        paydb.updatePayStatus(pix_path, data.info.status, amount_pay);
-        return (ctx.body = {
-          status: 200,
-          success: false,
-          code: -3,
-          msg: "订单已取消",
-        });
-      } else if (data.info.status == 4) {
-        //已退款
-        paydb.updatePayStatus(pix_path, data.info.status, amount_pay);
-        return (ctx.body = {
-          status: 200,
-          success: false,
-          code: -4,
-          msg: "订单已退款",
-        });
-      } else {
-        return (ctx.body = { status: -2, msg: "查询失败" });
-      }
+  // 0有效待付款ATIVA 1付款成功CONCLUIDA -1调用失败 2调用失败 2订单已过期 3订单已取消 4订单已退款
+  // 返回结构{ status: 0, pixCopiaECola: response.data.pixCopiaECola }
+  const res = await BBapi.getPayStatus(pix_path);
+  if (res.status == 1) {
+    // 返回付款成功
+    // const amount_pay = data.info.amount_pay;
+    paydb.updatePayStatus(pix_path, 0, res.payTotal);
+    return (ctx.body = {
+      status: 200,
+      success: false,
+      Payment: true,
+      code: 200,
+      msg: "付款已成功",
+    });
+  } else if (res.status == 0) {
+    // 待付款状态
+    // 检查是否过期
+    const exp = await paydb.checkExpDate(pix_path);
+    if (exp == 0) {
+      return (ctx.body = { status: -1, msg: "订单不存在，请检查数据库" });
+    } else if (exp == 2) {
+      //订单1️已过期，更新订单状态
+      paydb.updatePayStatus(pix_path, 5, 0);
+      //返回值
+      //订单没过期返回正常订单
+      return (ctx.body = {
+        status: 200,
+        success: false,
+        payment: false,
+        code: 200,
+        msg: "订单已过期expirado",
+      });
+    } else if (exp == 1) {
+      //订单没过期返回正常订单
+      return (ctx.body = {
+        status: 200,
+        success: true,
+        payment: false,
+        code: 200,
+        msg: "查询成功",
+        data: { pixCopiaECola: res.pixCopiaECola },
+      });
     }
-  } catch (error) {
-    console.log(error, "接口调用失败");
-    return (ctx.body = { status: -3, msg: "查询失败" });
   }
 };
 

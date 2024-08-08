@@ -20,6 +20,27 @@
   - index.js 分配路由访问到 api 文档中对应的接口
 - app.js 启动文件
 - config.js 配置文件
+- .env 环境配置处
+- certification 证书存放处，存放 crt 证书和 key
+
+## .env
+
+env 是敏感信息处，因此不上传到 git 中，请自行建立，内容为
+
+#mysql 的连接方式
+DB_HOST=
+DB_USER=
+DB_PASSWORD=n
+DB_DATABASE=
+
+#BBapi 的连接方式
+API_Login=
+API_HOST=
+API_client_id=
+API_client_secret=
+API_developer_application_key=
+API_BBchavepix=
+API_BBbankName=
 
 ## 项目启动
 

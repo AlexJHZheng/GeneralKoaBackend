@@ -2,8 +2,30 @@ const axios = require("axios"); //axios模块
 require("dotenv").config(); //导入环境变量
 const https = require("https");
 const bb = require("../db/bb"); //导入bb数据库
+const fs = require("fs");
+
+//引用根目录下certification文件夹下的certificate.crt
+// const cert = fs.readFileSync("../certification/certificate.crt");
+const path = require("path");
+const cert = fs.readFileSync(
+  path.join(__dirname, "../certification/certificate.crt"),
+  "utf8"
+);
+const key = fs.readFileSync(
+  path.join(__dirname, "../certification/privatenopass.key"),
+  "utf8"
+);
+// const ca = fs.readFileSync(
+//   path.join(__dirname, "../certification/ca.crt"),
+//   "utf8"
+// );
+
+// 创建https.Agent实例
 const agent = new https.Agent({
-  rejectUnauthorized: false, // 不验证证书
+  cert: cert,
+  key: key,
+  // ca: ca,
+  rejectUnauthorized: false, // 确保启用服务器证书验证
 });
 
 // 1.通过登陆接口获取token
@@ -73,6 +95,7 @@ exports.getQRCode = async (expiration, payTotal, userID) => {
     chave: chavepix,
     solicitacaoPagador: "QRpix" + userID,
   };
+  console.log(body, "body");
   try {
     const response = await axios.post(link, body, {
       headers: {
@@ -84,8 +107,8 @@ exports.getQRCode = async (expiration, payTotal, userID) => {
       httpsAgent: agent, // 使用自定义的 HTTPS Agent
     });
     //如果返回值为200，返回二维码链接
-    console.log(response, "response");
-    if (response.status === 200) {
+    console.log(response, "responsebbapigetqr");
+    if (response.status === 200 || response.status === 201) {
       // txid为银行流水唯一标识
       // 返回标准形式 创建时间，过期时间，金额，银行id，状态，pix码，银行名称
       // create_time,expiration,valor,bankId,status,pixCopiaECola，bankName
@@ -97,7 +120,7 @@ exports.getQRCode = async (expiration, payTotal, userID) => {
         bankId: response.data.txid,
         status: response.data.status,
         pixCopiaECola: response.data.pixCopiaECola,
-        bankName: "BBTest",
+        bankName: process.env.API_BBbankName,
       };
     } else {
       console.log("银行接口调用失败");
@@ -114,5 +137,45 @@ exports.getQRCode = async (expiration, payTotal, userID) => {
     } else {
       console.error("Error setting up request:", error.message);
     }
+  }
+};
+
+// 4.获取当前pix的付款情况
+exports.getPayStatus = async (pix_path) => {
+  const token = await this.getBB(); //获取token
+  const link = process.env.API_HOST + "/" + pix_path; //获取环境变量中的api地址
+  // 调用接口
+  console.log(link, "get地址");
+  try {
+    const response = await axios.get(link, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "X-Developer-Application-Key":
+          process.env.API_developer_application_key,
+      },
+      httpsAgent: agent, // 使用自定义的 HTTPS Agent
+    });
+    console.log(response, "response");
+    //如果返回值为200，返回二维码链接
+    if (response.status === 200) {
+      // txid为银行流水唯一标识
+      // 返回标准形式 创建时间，过期时间，金额，银行id，状态，pix码，银行名称
+      // create_time,expiration,valor,bankId,status,pixCopiaECola，bankName
+      if (response.data.status === "CONCLUIDA") {
+        return { status: 1 };
+      } else {
+        return {
+          status: 0,
+          pixCopiaECola: response.data.pixCopiaECola,
+          payTotal: response.data.valor.original,
+        };
+      }
+    } else {
+      console.log("BB查询接口调用失败");
+      return -1;
+    }
+  } catch (err) {
+    console.error("BB查询接口出错:", error);
+    return -1;
   }
 };
