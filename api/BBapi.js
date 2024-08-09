@@ -53,8 +53,8 @@ exports.loginBB = async (ctx) => {
     expires_in: response.data.expires_in,
     scope: response.data.scope,
   };
-  const res = await bb.updateToken(data);
-  return res.access_token;
+  await bb.updateToken(data);
+  return response.data.access_token;
 };
 
 // 2.获取token,如果token过期，通过loginBB方法重新获取token
@@ -68,7 +68,8 @@ exports.getBB = async (ctx) => {
   const expires_in = criar_time + (token.expires_in - 120) * 1000;
   if (now > expires_in) {
     //过期了，重新获取token
-    await this.loginBB();
+    const res = await this.loginBB();
+    return res;
   } else {
     //没有过期，直接返回token
     return token.access_token;
@@ -95,7 +96,6 @@ exports.getQRCode = async (expiration, payTotal, userID) => {
     chave: chavepix,
     solicitacaoPagador: "QRpix" + userID,
   };
-  console.log(body, "body");
   try {
     const response = await axios.post(link, body, {
       headers: {
@@ -107,7 +107,6 @@ exports.getQRCode = async (expiration, payTotal, userID) => {
       httpsAgent: agent, // 使用自定义的 HTTPS Agent
     });
     //如果返回值为200，返回二维码链接
-    console.log(response, "responsebbapigetqr");
     if (response.status === 200 || response.status === 201) {
       // txid为银行流水唯一标识
       // 返回标准形式 创建时间，过期时间，金额，银行id，状态，pix码，银行名称
@@ -127,15 +126,15 @@ exports.getQRCode = async (expiration, payTotal, userID) => {
       return { check: false };
     }
   } catch (err) {
-    console.error("Error making request:", error);
-    if (error.response) {
-      console.error("Response data:", error.response.data);
-      console.error("Response status:", error.response.status);
-      console.error("Response headers:", error.response.headers);
-    } else if (error.request) {
-      console.error("No response received:", error.request);
+    console.error("Error making request:", err);
+    if (err.response) {
+      console.error("Response data:", err.response.data);
+      console.error("Response status:", err.response.status);
+      console.error("Response headers:", err.response.headers);
+    } else if (err.request) {
+      console.error("No response received:", err.request);
     } else {
-      console.error("Error setting up request:", error.message);
+      console.error("Error setting up request:", err.message);
     }
   }
 };
@@ -145,7 +144,6 @@ exports.getPayStatus = async (pix_path) => {
   const token = await this.getBB(); //获取token
   const link = process.env.API_HOST + "/" + pix_path; //获取环境变量中的api地址
   // 调用接口
-  console.log(link, "get地址");
   try {
     const response = await axios.get(link, {
       headers: {
@@ -155,7 +153,6 @@ exports.getPayStatus = async (pix_path) => {
       },
       httpsAgent: agent, // 使用自定义的 HTTPS Agent
     });
-    console.log(response, "response");
     //如果返回值为200，返回二维码链接
     if (response.status === 200) {
       // txid为银行流水唯一标识

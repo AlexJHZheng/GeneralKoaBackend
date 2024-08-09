@@ -9,6 +9,10 @@ const router = new Router({
 });
 //webhook接口路由
 router.post("/webhook", api_weebhook.webhookReceve);
+
+//巴西银行webhook接口路由
+router.post("/webhookBB", api_weebhook.webhookBB);
+
 //注册webhook接口路由
 router.post("/registerWebhook", api_weebhook.registerWebhook);
 // 注册接口路由 ok

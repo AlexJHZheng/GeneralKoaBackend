@@ -60,7 +60,6 @@ exports.addPayFlow = async (ctx) => {
   //传入数据调用pixapi接口
   try {
     const resultApi = await BBapi.getQRCode(expiration, payTotal, userID);
-    console.log(resultApi, "检查点1");
     if (resultApi.check) {
       // 调用成功
       console.log(resultApi, "接口调用成功");
@@ -182,7 +181,6 @@ exports.getPayFlowList = async (ctx) => {
   const token = ctx.header.authorization;
   // 获取时间段
   // const time = ctx.request.query
-  console.log(ctx.request.query);
   // 如果ctx.request.query存在，则解析出startTime和endTime
   let startTime = "";
   let endTime = "";
