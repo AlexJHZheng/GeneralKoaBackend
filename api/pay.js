@@ -4,7 +4,6 @@ const jwt = require("jsonwebtoken"); //token生成模块
 const config = require("../config"); //配置文件
 const axios = require("axios"); //axios模块
 const BBapi = require("../api/BBapi");
-const pay = require("../db/pay");
 
 // 新增支付流水
 exports.addPayFlow = async (ctx) => {
@@ -198,7 +197,6 @@ exports.getPayFlowList = async (ctx) => {
   });
   // 根据用户ID获取用户角色
   const userRole = await userdb.getUserRoles(username).then((res) => {
-    console.log(res, "用户角色");
     return res;
   });
   const currentPage = ctx.request.query.currentPage;
@@ -218,5 +216,87 @@ exports.getPayFlowList = async (ctx) => {
     });
   } else {
     return (ctx.body = { status: -1, msg: "支付流水列表获取失败" });
+  }
+};
+
+// 获取客户对账总金额和明细（分页）
+exports.getPayTotalList = async (ctx) => {
+  // 先获取用户ID
+  // 接着获取用户角色
+  // 调用db/pay.js中的getPayFlowList方法
+  // 返回结果
+  const token = ctx.header.authorization;
+  // 获取时间段
+  // const time = ctx.request.query
+  // 如果ctx.request.query存在，则解析出startTime和endTime
+  let startTime = "";
+  let endTime = "";
+  if (ctx.request.query) {
+    startTime = ctx.request.query.startTime;
+    endTime = ctx.request.query.endTime;
+  }
+  // 截取掉Bearer和空格
+  const tokenStr = token.substring(7);
+  // 解析token,获取用户名
+  const username = jwt.decode(tokenStr, config.secretKey).username; // 解密，获取payload
+  // 根据用户名获取用户ID
+  const userID = await userdb.getUserID(username).then((res) => {
+    return res;
+  });
+  const currentPage = ctx.request.query.currentPage;
+  const pageSize = ctx.request.query.pageSize;
+
+  // 调用db/pay.js中的getPayTotalList方法
+  const result = await paydb
+    .getPayTotalList(userID, startTime, endTime, currentPage, pageSize)
+    .then((res) => {
+      return res;
+    });
+
+  if (result) {
+    return (ctx.body = {
+      status: 200,
+      msg: "支付流水列表获取成功",
+      data: result,
+    });
+  } else {
+    return (ctx.body = { status: -1, msg: "支付流水列表获取失败" });
+  }
+};
+
+// 获取客户时间段销售金额总计
+exports.getPayShopTotal = async (ctx) => {
+  const token = ctx.header.authorization;
+  let startTime = "";
+  let endTime = "";
+  if (ctx.request.query) {
+    startTime = ctx.request.query.startTime;
+    endTime = ctx.request.query.endTime;
+  }
+  // 截取掉Bearer和空格
+  const tokenStr = token.substring(7);
+  // 解析token,获取用户名
+  const username = jwt.decode(tokenStr, config.secretKey).username; // 解密，获取payload
+  // 根据用户名确定是否有管理员权限
+  const userRole = await userdb.getUserRoles(username).then((res) => {
+    return res;
+  });
+  if (userRole != "admin") {
+    return (ctx.body = { status: -1, msg: "无权限" });
+  } else {
+    const result = await paydb
+      .getPayShopTotal(startTime, endTime)
+      .then((res) => {
+        return res;
+      });
+    if (result) {
+      return (ctx.body = {
+        status: 200,
+        msg: "支付流水列表获取成功",
+        data: result,
+      });
+    } else {
+      return (ctx.body = { status: -2, msg: "支付流水列表获取失败" });
+    }
   }
 };

@@ -37,6 +37,12 @@ router.post("/checkToken", api_user.checkToken);
 // 获取支付流水列表
 router.get("/getPayFlowList", api_pay.getPayFlowList);
 
+// 获取期间店家已支付的总金额和明细列表
+router.get("/getPayTotalList", api_pay.getPayTotalList);
+
+// 获取所有店家支付总金额
+router.get("/getPayShopTotal", api_pay.getPayShopTotal);
+
 router.get("/", async (ctx) => {
   ctx.body = "servece ok 182555";
 });

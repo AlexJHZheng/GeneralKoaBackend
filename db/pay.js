@@ -139,6 +139,137 @@ async function checkExpDate(pix_path) {
   return 0;
 }
 
+// 获取店家的支付流水和总计（分页）
+async function getPayTotalList(
+  userID,
+  startTime,
+  endTime,
+  currentPage,
+  pageSize
+) {
+  // 如果用户没有提供时间段，则默认使用今天的整天时间段
+  // 如果用户没有提供时间段，则默认使用今天的整天时间段
+  if (!startTime || !endTime) {
+    const today = new Date();
+
+    // 获取今天的开始时间 (00:00:00)
+    startTime = new Date(today.setHours(0, 0, 0, 0))
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ");
+
+    // 获取今天的结束时间 (23:59:59)
+    endTime = new Date(today.setHours(23, 59, 59, 999))
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ");
+  }
+
+  // 构建查询条件，强制检查 payStatus = 0 和 userID
+  const conditions = `
+  WHERE PayFlow.payDate BETWEEN '${startTime}' AND '${endTime}' 
+  AND PayFlow.payStatus = 0 
+  AND PayFlow.userID = '${userID}'
+`;
+
+  // 构建查询分页记录和总金额的SQL
+  let sql = `
+  SELECT PayFlow.payNum, PayFlow.payTotal, PayFlow.payDate, PayFlow.payStatus, PayFlow.payObs,
+  PayFlow.payClient, PayFlow.pix_path, PayFlow.payTotalReceved, PayFlow.expDate, User.username, User.summary 
+  FROM PayFlow
+  LEFT JOIN User ON PayFlow.userID = User.ID
+  ${conditions}
+  ORDER BY PayFlow.payDate ASC
+  LIMIT ${(currentPage - 1) * pageSize}, ${pageSize}
+`;
+
+  // 构建统计总数和总金额的SQL
+  let countSql = `
+  SELECT COUNT(*) AS total, SUM(PayFlow.payTotal) AS totalAmount
+  FROM PayFlow
+  LEFT JOIN User ON PayFlow.userID = User.ID
+  ${conditions}
+`;
+
+  // 执行SQL查询
+  const [result, countResult] = await Promise.all([db(sql), db(countSql)]);
+  const totalCount = countResult[0].total;
+  let totalAmount = countResult[0].totalAmount || 0; // 计算总金额，如果没有符合条件的记录，则为0
+  // 处理浮点数精度问题，将 totalAmount 保留两位小数
+  totalAmount = parseFloat(totalAmount.toFixed(2));
+
+  // 返回结果
+  return {
+    data: result,
+    total: totalCount,
+    totalAmount: totalAmount,
+    currentPage: currentPage,
+    pageSize: pageSize,
+  };
+}
+
+// 获取所有用户的支付流水和总计（不分页）
+async function getPayShopTotal(startTime, endTime) {
+  // 如果用户没有提供时间段，则默认使用今天的整天时间段
+  if (!startTime || !endTime) {
+    const today = new Date();
+
+    // 获取今天的开始时间 (00:00:00)
+    startTime = new Date(today.setHours(0, 0, 0, 0))
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ");
+
+    // 获取今天的结束时间 (23:59:59)
+    endTime = new Date(today.setHours(23, 59, 59, 999))
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ");
+  }
+
+  // 构建查询条件，检查 payStatus = 0
+  const conditions = `
+  WHERE PayFlow.payDate BETWEEN '${startTime}' AND '${endTime}' 
+  AND PayFlow.payStatus = 0
+`;
+
+  // 构建通过 UserID 聚合的SQL查询，计算每个用户的总金额并显示 summary
+  let sql = `
+  SELECT PayFlow.userID, User.username, User.summary, SUM(PayFlow.payTotal) AS totalAmount
+  FROM PayFlow
+  LEFT JOIN User ON PayFlow.userID = User.ID
+  ${conditions}
+  GROUP BY PayFlow.userID, User.username, User.summary
+  ORDER BY totalAmount DESC
+`;
+
+  // 构建统计所有用户总金额的SQL
+  let totalSql = `
+  SELECT SUM(PayFlow.payTotal) AS grandTotalAmount
+  FROM PayFlow
+  ${conditions}
+`;
+
+  // 执行SQL查询
+  const [result, totalResult] = await Promise.all([db(sql), db(totalSql)]);
+  let grandTotalAmount = totalResult[0].grandTotalAmount || 0; // 总计所有用户的金额
+
+  // 处理浮点数精度问题，将 totalAmount 和 grandTotalAmount 保留两位小数
+  grandTotalAmount = parseFloat(grandTotalAmount.toFixed(2));
+
+  // 处理每个用户的总金额
+  result.forEach((item) => {
+    item.totalAmount = parseFloat(item.totalAmount.toFixed(2));
+  });
+
+  // 返回结果
+  return {
+    data: result,
+    total: result.length, // 结果集中用户的总数
+    grandTotalAmount: grandTotalAmount, // 所有用户的总金额
+  };
+}
+
 module.exports = {
   addPayFlow: addPayFlow,
   checkPayNum: checkPayNum,
@@ -146,4 +277,6 @@ module.exports = {
   getPayList: getPayList,
   checkPixPath: checkPixPath,
   checkExpDate: checkExpDate,
+  getPayTotalList: getPayTotalList,
+  getPayShopTotal: getPayShopTotal,
 };
