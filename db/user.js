@@ -48,6 +48,19 @@ async function getUserID(user) {
   return false;
 }
 
+//通过用户名获取用户和店铺ID
+async function getUsershopID(user) {
+  const sql = `SELECT ID, shopID FROM User WHERE userName = '${user}'`;
+  const result = await db(sql);
+  if (result.length > 0) {
+    return {
+      userID: result[0].ID,
+      shopID: result[0].shopID,
+    };
+  }
+  return false;
+}
+
 // 获取用户权限
 async function getUserRoles(user) {
   const sql = `select * from User where userName='${user}'`;
@@ -64,4 +77,5 @@ module.exports = {
   register: register,
   getUserID: getUserID,
   getUserRoles: getUserRoles,
+  getUsershopID: getUsershopID,
 };

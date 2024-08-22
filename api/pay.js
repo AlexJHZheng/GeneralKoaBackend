@@ -2,7 +2,6 @@ const paydb = require("../db/pay");
 const userdb = require("../db/user");
 const jwt = require("jsonwebtoken"); //token生成模块
 const config = require("../config"); //配置文件
-const axios = require("axios"); //axios模块
 const BBapi = require("../api/BBapi");
 
 // 新增支付流水
@@ -20,12 +19,15 @@ exports.addPayFlow = async (ctx) => {
 
   // payNum不能为空
   if (!payNum) {
-    return (ctx.body = { status: -3, msg: "订单号不能为空" });
+    return (ctx.body = {
+      status: -3,
+      msg: "O número do pedido não pode ficar vazio",
+    });
   }
   // 查询数据库中payNum是否存在
   const payNumExist = await paydb.checkPayNum(payNum);
   if (payNumExist) {
-    return (ctx.body = { status: -4, msg: "订单号已存在" });
+    return (ctx.body = { status: -4, msg: "O número do pedido já existe" });
   }
   // 获取token
   const token = ctx.header.authorization;
@@ -33,18 +35,26 @@ exports.addPayFlow = async (ctx) => {
   const tokenStr = token.substring(7);
   // 解析token,获取用户名
   const username = jwt.decode(tokenStr, config.secretKey).username; // 解密，获取payload
-  // 根据用户名获取用户ID
+  // 根据用户名获取用户ID和店铺ID
   console.log("用户名" + username);
-  const userID = await userdb.getUserID(username).then((res) => {
+  const user = await userdb.getUsershopID(username).then((res) => {
     console.log(res, "用户ID");
     return res;
   });
+  const userID = user.userID;
+  const shopID = user.shopID;
   // 验证
   if (!payTotal) {
-    return (ctx.body = { status: -1, msg: "支付金额不能为空" });
+    return (ctx.body = {
+      status: -1,
+      msg: "O valor do pagamento não pode ficar vazio",
+    });
   }
   if (!userID) {
-    return (ctx.body = { status: -2, msg: "用户ID不能为空" });
+    return (ctx.body = {
+      status: -2,
+      msg: "O ID do usuário não pode ficar vazio",
+    });
   }
   // 向银行请求支付，获取二维码链接和支付订单号
   let pix_path = ""; //订单号
@@ -61,7 +71,7 @@ exports.addPayFlow = async (ctx) => {
     const resultApi = await BBapi.getQRCode(expiration, payTotal, userID);
     if (resultApi.check) {
       // 调用成功
-      console.log(resultApi, "接口调用成功");
+      // console.log(resultApi, "接口调用成功");
       pix_path = resultApi.bankId;
       pix_copy = resultApi.pixCopiaECola;
       const bankName = resultApi.bankName;
@@ -74,25 +84,36 @@ exports.addPayFlow = async (ctx) => {
         payClient,
         pix_path,
         expiration,
-        bankName
+        bankName,
+        shopID
       );
       // 判断写入情况
       if (result) {
         return (ctx.body = {
           status: 200,
-          msg: "支付流水新增成功",
+          msg: "Fluxo de pagamento adicionado com sucesso",
           data: { pix_path, pix_copy },
         });
       } else {
-        return (ctx.body = { status: -5, msg: "支付流水新增失败" });
+        return (ctx.body = {
+          status: -5,
+          msg: "Falha ao adicionar fluxo de pagamento",
+        });
       }
     } else {
       // 调用失败
-      return (ctx.body = { status: -6, msg: "银行接口调用失败" });
+      return (ctx.body = {
+        status: -6,
+        msg: "Falha na chamada da interface do banco",
+      });
     }
   } catch (error) {
     console.log(error, "error");
-    return (ctx.body = { status: -7, msg: "银行接口调用失败", error: error });
+    return (ctx.body = {
+      status: -7,
+      msg: "Falha na chamada da interface do banco",
+      error: error,
+    });
   }
 };
 
@@ -103,21 +124,36 @@ exports.updatePayStatus = async (ctx) => {
   const payStatus = payInfo.payStatus;
   // 检查payStatus只能为1,2
   if (payStatus != 1 && payStatus != 2) {
-    return (ctx.body = { status: -4, msg: "支付状态只能为1或2" });
+    return (ctx.body = {
+      status: -4,
+      msg: "O status do pagamento só pode ser 1 ou 2",
+    });
   }
   if (!payNum) {
-    return (ctx.body = { status: -1, msg: "订单号不能为空" });
+    return (ctx.body = {
+      status: -1,
+      msg: "O número do pedido não pode ficar vazio",
+    });
   }
   if (!payStatus) {
-    return (ctx.body = { status: -2, msg: "支付状态不能为空" });
+    return (ctx.body = {
+      status: -2,
+      msg: "O status do pagamento não pode ficar vazio",
+    });
   }
   const result = await paydb.updatePayStatus(payNum, payStatus).then((res) => {
     return res;
   });
   if (result) {
-    return (ctx.body = { status: 200, msg: "支付流水状态修改成功" });
+    return (ctx.body = {
+      status: 200,
+      msg: "Status do pagamento modificado com sucesso",
+    });
   } else {
-    return (ctx.body = { status: -3, msg: "支付流水状态修改失败" });
+    return (ctx.body = {
+      status: -3,
+      msg: "Falha ao modificar o status do pagamento",
+    });
   }
 };
 
@@ -137,14 +173,17 @@ exports.getPayStatus = async (ctx) => {
       success: false,
       Payment: true,
       code: 200,
-      msg: "付款已成功",
+      msg: "Pagamento bem sucedido",
     });
   } else if (res.status == 0) {
     // 待付款状态
     // 检查是否过期
     const exp = await paydb.checkExpDate(pix_path);
     if (exp == 0) {
-      return (ctx.body = { status: -1, msg: "订单不存在，请检查数据库" });
+      return (ctx.body = {
+        status: -1,
+        msg: "O pedido não existe, verifique o banco de dados",
+      });
     } else if (exp == 2) {
       //订单1️已过期，更新订单状态
       paydb.updatePayStatus(pix_path, 5, 0);
@@ -155,7 +194,7 @@ exports.getPayStatus = async (ctx) => {
         success: false,
         payment: false,
         code: 200,
-        msg: "订单已过期expirado",
+        msg: "expirado",
       });
     } else if (exp == 1) {
       //订单没过期返回正常订单
@@ -164,7 +203,7 @@ exports.getPayStatus = async (ctx) => {
         success: true,
         payment: false,
         code: 200,
-        msg: "查询成功",
+        msg: "consulta success",
         data: { pixCopiaECola: res.pixCopiaECola },
       });
     }
@@ -192,18 +231,32 @@ exports.getPayFlowList = async (ctx) => {
   // 解析token,获取用户名
   const username = jwt.decode(tokenStr, config.secretKey).username; // 解密，获取payload
   // 根据用户名获取用户ID
-  const userID = await userdb.getUserID(username).then((res) => {
+  const user = await userdb.getUsershopID(username).then((res) => {
+    console.log(res, "用户ID");
     return res;
   });
+  const userID = user.userID;
+  const shopID = user.shopID;
   // 根据用户ID获取用户角色
   const userRole = await userdb.getUserRoles(username).then((res) => {
     return res;
   });
   const currentPage = ctx.request.query.currentPage;
   const pageSize = ctx.request.query.pageSize;
+  const query = ctx.request.query.search;
+  // console.log(query, "query内容");
   // 调用db/pay.js中的getPayFlowList方法
   const result = await paydb
-    .getPayList(userRole, userID, startTime, endTime, currentPage, pageSize)
+    .getPayList(
+      userRole,
+      userID,
+      shopID,
+      startTime,
+      endTime,
+      currentPage,
+      pageSize,
+      query
+    )
     .then((res) => {
       return res;
     });
@@ -211,11 +264,11 @@ exports.getPayFlowList = async (ctx) => {
   if (result) {
     return (ctx.body = {
       status: 200,
-      msg: "支付流水列表获取成功",
+      msg: "Lista obtida com sucesso",
       data: result,
     });
   } else {
-    return (ctx.body = { status: -1, msg: "支付流水列表获取失败" });
+    return (ctx.body = { status: -1, msg: "Lista obtida com falhado" });
   }
 };
 
@@ -240,15 +293,18 @@ exports.getPayTotalList = async (ctx) => {
   // 解析token,获取用户名
   const username = jwt.decode(tokenStr, config.secretKey).username; // 解密，获取payload
   // 根据用户名获取用户ID
-  const userID = await userdb.getUserID(username).then((res) => {
+  const user = await userdb.getUsershopID(username).then((res) => {
+    console.log(res, "用户ID");
     return res;
   });
+  const userID = user.userID;
+  const shopID = user.shopID;
   const currentPage = ctx.request.query.currentPage;
   const pageSize = ctx.request.query.pageSize;
 
   // 调用db/pay.js中的getPayTotalList方法
   const result = await paydb
-    .getPayTotalList(userID, startTime, endTime, currentPage, pageSize)
+    .getPayTotalList(userID, shopID, startTime, endTime, currentPage, pageSize)
     .then((res) => {
       return res;
     });
@@ -256,11 +312,14 @@ exports.getPayTotalList = async (ctx) => {
   if (result) {
     return (ctx.body = {
       status: 200,
-      msg: "支付流水列表获取成功",
+      msg: "A lista de boletos de pagamento foi obtida com sucesso",
       data: result,
     });
   } else {
-    return (ctx.body = { status: -1, msg: "支付流水列表获取失败" });
+    return (ctx.body = {
+      status: -1,
+      msg: "Falha ao obter lista de comprovantes de pagamento",
+    });
   }
 };
 
@@ -282,7 +341,7 @@ exports.getPayShopTotal = async (ctx) => {
     return res;
   });
   if (userRole != "admin") {
-    return (ctx.body = { status: -1, msg: "无权限" });
+    return (ctx.body = { status: -1, msg: "Sem permissão" });
   } else {
     const result = await paydb
       .getPayShopTotal(startTime, endTime)
@@ -292,11 +351,14 @@ exports.getPayShopTotal = async (ctx) => {
     if (result) {
       return (ctx.body = {
         status: 200,
-        msg: "支付流水列表获取成功",
+        msg: "A lista de boletos de pagamento foi obtida com sucesso",
         data: result,
       });
     } else {
-      return (ctx.body = { status: -2, msg: "支付流水列表获取失败" });
+      return (ctx.body = {
+        status: -2,
+        msg: "Falha ao obter lista de comprovantes de pagamento",
+      });
     }
   }
 };

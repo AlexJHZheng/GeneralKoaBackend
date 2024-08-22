@@ -11,11 +11,12 @@ async function addPayFlow(
   payClient,
   pix_path,
   expiration,
-  bankName
+  bankName,
+  shopID
 ) {
   console.log(payNum, "payNum2");
-  const sql = `insert into PayFlow(payTotal,payDate,userID,payStatus,payObs,payNum,payClient,pix_path,payTotalReceved,recStatus,checkStatus,deleted,expDate,bankName) 
-    values('${payTotal}',now(),'${userID}',1,'${payObs}','${payNum}','${payClient}','${pix_path}',0,0,0,0,DATE_ADD(NOW(), INTERVAL ${expiration} MINUTE), '${bankName}')`;
+  const sql = `insert into PayFlow(payTotal,payDate,userID,payStatus,payObs,payNum,payClient,pix_path,payTotalReceved,recStatus,checkStatus,deleted,expDate,bankName,shopID) 
+    values('${payTotal}',now(),'${userID}',1,'${payObs}','${payNum}','${payClient}','${pix_path}',0,0,0,0,DATE_ADD(NOW(), INTERVAL ${expiration} MINUTE), '${bankName}', '${shopID}')`;
   const result = await db(sql);
   if (result.affectedRows > 0) {
     console.log(result.affectedRows, "数据库插入行数");
@@ -46,58 +47,70 @@ async function updatePayStatus(pix_path, payStatus, payTotalReceved) {
   }
   return false;
 }
+
 // 通过传入的用户权限(admin,editot)和用户ID来获取订单列表，如果是admin则获取所有订单，如果是editor则获取该用户的订单
 // 传入数据为userRole,userID
 async function getPayList(
   userRole,
   userID,
+  shopID,
   startTime,
   endTime,
   currentPage,
-  pageSize
+  pageSize,
+  query
 ) {
-  // 如果startTime和endTime存在，则查询时间段内的订单，如果不存在，则查询所有订单
-  // 查询要联合User表获取summary信息,其中User表中ID和payFlow表中的userID相同
-  // 如果是admin，则查询所有订单
-  // 如果是editor，则查询该用户的订单
-  // 查询结果取 PayFlow中的payNum,payTotal,payDate,payStatus,payObs,payClient,pix_path,payTotalReceved和User中的username,summary
-  let sql = "";
-  let countSql = "";
-  let conditions = "";
-  if (userRole === "admin") {
-    if (startTime && endTime) {
-      conditions = `WHERE PayFlow.payDate BETWEEN '${startTime}' AND '${endTime}' `;
-    }
-  } else if (userRole === "editor") {
-    if (startTime && endTime) {
-      conditions = `WHERE PayFlow.payDate BETWEEN '${startTime}' AND '${endTime}' AND PayFlow.userID = '${userID}' `;
-    } else {
-      conditions = `WHERE PayFlow.userID = '${userID}' `;
-    }
+  // 如果没有提供时间范围，默认设置为今天的开始到结束
+  if (!startTime || !endTime) {
+    const today = new Date();
+    startTime =
+      new Date(today.setHours(0, 0, 0, 0)).toISOString().split("T")[0] +
+      " 00:00:00";
+    endTime =
+      new Date(today.setHours(23, 59, 59, 999)).toISOString().split("T")[0] +
+      " 23:59:59";
   }
-  // 如果conditions为空，则插入 `WHERE PayFlow.deleted = 0`
-  // 如果不为空，则给conditions加上 `AND PayFlow.deleted = 0`
-  if (conditions === "") {
-    conditions = `WHERE PayFlow.deleted = 0 `;
-  } else {
-    conditions = conditions + `AND PayFlow.deleted = 0 `;
+
+  // 初始化条件语句
+  let conditions = `WHERE PayFlow.payDate BETWEEN '${startTime}' AND '${endTime}' `;
+
+  // 修改后的用户角色和shopID判断
+  if (userRole === "editor" || userRole === "user") {
+    conditions += `AND PayFlow.shopID = '${shopID}' `;
   }
-  sql = `
+
+  // 添加模糊搜索条件
+  if (query) {
+    const searchQuery = `%${query}%`;
+    conditions += `AND (PayFlow.payObs LIKE '${searchQuery}' OR PayFlow.payClient LIKE '${searchQuery}' OR PayFlow.payTotal LIKE '${searchQuery}') `;
+  }
+
+  // 追加固定条件: PayFlow.payStatus = 0
+  conditions += `AND PayFlow.payStatus = 0 `;
+
+  // 构造SQL查询语句，LEFT JOIN 时获取 User.shopID
+  const sql = `
   SELECT PayFlow.payNum, PayFlow.payTotal, PayFlow.payDate, PayFlow.payStatus, PayFlow.payObs,
-  PayFlow.payClient, PayFlow.pix_path, PayFlow.payTotalReceved, PayFlow.expDate,User.username, User.summary 
+    PayFlow.payClient, PayFlow.pix_path, PayFlow.payTotalReceved, PayFlow.expDate, User.username, 
+    User.summary, User.shopID
   FROM PayFlow
   LEFT JOIN User ON PayFlow.userID = User.ID
   ${conditions}
   ORDER BY PayFlow.payDate ASC
   LIMIT ${(currentPage - 1) * pageSize}, ${pageSize}
 `;
-  countSql = `
-    SELECT COUNT(*) AS total
-    FROM PayFlow
-    LEFT JOIN User ON PayFlow.userID = User.ID
-    ${conditions}
-  `;
 
+  // 修改 countSql 查询，去除 LEFT JOIN
+  const countSql = `
+  SELECT COUNT(*) AS total
+  FROM PayFlow
+  ${conditions}
+`;
+
+  // 打印 SQL 查询语句以进行调试
+  console.log("SQL Query:", sql);
+
+  // 执行查询
   const [result, countResult] = await Promise.all([db(sql), db(countSql)]);
   const totalCount = countResult[0].total;
 
@@ -142,6 +155,7 @@ async function checkExpDate(pix_path) {
 // 获取店家的支付流水和总计（分页）
 async function getPayTotalList(
   userID,
+  shopID,
   startTime,
   endTime,
   currentPage,
@@ -169,7 +183,7 @@ async function getPayTotalList(
   const conditions = `
   WHERE PayFlow.payDate BETWEEN '${startTime}' AND '${endTime}' 
   AND PayFlow.payStatus = 0 
-  AND PayFlow.userID = '${userID}'
+  AND PayFlow.shopID = '${shopID}'
 `;
 
   // 构建查询分页记录和总金额的SQL
@@ -187,7 +201,6 @@ async function getPayTotalList(
   let countSql = `
   SELECT COUNT(*) AS total, SUM(PayFlow.payTotal) AS totalAmount
   FROM PayFlow
-  LEFT JOIN User ON PayFlow.userID = User.ID
   ${conditions}
 `;
 
@@ -235,11 +248,11 @@ async function getPayShopTotal(startTime, endTime) {
 
   // 构建通过 UserID 聚合的SQL查询，计算每个用户的总金额并显示 summary
   let sql = `
-  SELECT PayFlow.userID, User.username, User.summary, SUM(PayFlow.payTotal) AS totalAmount
+  SELECT PayFlow.shopID, User.shopID, User.summary, SUM(PayFlow.payTotal) AS totalAmount
   FROM PayFlow
   LEFT JOIN User ON PayFlow.userID = User.ID
   ${conditions}
-  GROUP BY PayFlow.userID, User.username, User.summary
+  GROUP BY PayFlow.shopID, User.summary
   ORDER BY totalAmount DESC
 `;
 
