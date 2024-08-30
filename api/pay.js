@@ -3,6 +3,7 @@ const userdb = require("../db/user");
 const jwt = require("jsonwebtoken"); //token生成模块
 const config = require("../config"); //配置文件
 const BBapi = require("../api/BBapi");
+const timenow = new Date();
 
 // 新增支付流水
 exports.addPayFlow = async (ctx) => {
@@ -10,13 +11,12 @@ exports.addPayFlow = async (ctx) => {
   const startTime = new Date();
   // 获取请求的用户信息，并解析出用户名和密码
   const payInfo = ctx.request.body;
-  const payTotal = payInfo.payTotal; // 订单金额
+  let payTotal = payInfo.payTotal; // 订单金额
+  payTotal = parseFloat(payTotal).toFixed(2); // 保留两位小数
   const payObs = payInfo.payObs; // 订单备注
   const payNum = payInfo.payNum; // 订单号
-  console.log(payNum, "订单号");
   const payClient = payInfo.payClient; // 客人名字
   const expiration = payInfo.expiration; // 过期时间-分钟
-
   // payNum不能为空
   if (!payNum) {
     return (ctx.body = {
@@ -34,11 +34,9 @@ exports.addPayFlow = async (ctx) => {
   // 截取掉Bearer和空格
   const tokenStr = token.substring(7);
   // 解析token,获取用户名
-  const username = jwt.decode(tokenStr, config.secretKey).username; // 解密，获取payload
+  const username = jwt.decode(tokenStr, config.secretKey).username;
   // 根据用户名获取用户ID和店铺ID
-  console.log("用户名" + username);
   const user = await userdb.getUsershopID(username).then((res) => {
-    console.log(res, "用户ID");
     return res;
   });
   const userID = user.userID;
@@ -71,7 +69,6 @@ exports.addPayFlow = async (ctx) => {
     const resultApi = await BBapi.getQRCode(expiration, payTotal, userID);
     if (resultApi.check) {
       // 调用成功
-      // console.log(resultApi, "接口调用成功");
       pix_path = resultApi.bankId;
       pix_copy = resultApi.pixCopiaECola;
       const bankName = resultApi.bankName;
@@ -89,12 +86,18 @@ exports.addPayFlow = async (ctx) => {
       );
       // 判断写入情况
       if (result) {
+        console.log(
+          timenow + "用户" + username + "创建收款流水金额" + payTotal + "成功"
+        );
         return (ctx.body = {
           status: 200,
           msg: "Fluxo de pagamento adicionado com sucesso",
           data: { pix_path, pix_copy },
         });
       } else {
+        console.log(
+          timenow + "用户" + username + "创建收款流水金额" + payTotal + "失败"
+        );
         return (ctx.body = {
           status: -5,
           msg: "Falha ao adicionar fluxo de pagamento",
@@ -159,6 +162,13 @@ exports.updatePayStatus = async (ctx) => {
 
 // 查询支付状态
 exports.getPayStatus = async (ctx) => {
+  // 获取token
+  const token = ctx.header.authorization;
+  // 截取掉Bearer和空格
+  const tokenStr = token.substring(7);
+  // 解析token,获取用户名
+  const username = jwt.decode(tokenStr, config.secretKey).username;
+  console.log(timenow + "用户" + username + "查询支付状态");
   const pix_path = ctx.request.body.pix_path;
   // 调用银行接口查询支付状态
   // 0有效待付款ATIVA 1付款成功CONCLUIDA -1调用失败 2调用失败 2订单已过期 3订单已取消 4订单已退款
@@ -232,7 +242,6 @@ exports.getPayFlowList = async (ctx) => {
   const username = jwt.decode(tokenStr, config.secretKey).username; // 解密，获取payload
   // 根据用户名获取用户ID
   const user = await userdb.getUsershopID(username).then((res) => {
-    console.log(res, "用户ID");
     return res;
   });
   const userID = user.userID;
@@ -244,7 +253,7 @@ exports.getPayFlowList = async (ctx) => {
   const currentPage = ctx.request.query.currentPage;
   const pageSize = ctx.request.query.pageSize;
   const query = ctx.request.query.search;
-  // console.log(query, "query内容");
+  console.log(timenow + "用户" + username + "查询支付流水列表");
   // 调用db/pay.js中的getPayFlowList方法
   const result = await paydb
     .getPayList(
@@ -294,14 +303,13 @@ exports.getPayTotalList = async (ctx) => {
   const username = jwt.decode(tokenStr, config.secretKey).username; // 解密，获取payload
   // 根据用户名获取用户ID
   const user = await userdb.getUsershopID(username).then((res) => {
-    console.log(res, "用户ID");
     return res;
   });
   const userID = user.userID;
   const shopID = user.shopID;
   const currentPage = ctx.request.query.currentPage;
   const pageSize = ctx.request.query.pageSize;
-
+  console.log(timenow + "用户" + username + "查询自己店铺对账表");
   // 调用db/pay.js中的getPayTotalList方法
   const result = await paydb
     .getPayTotalList(userID, shopID, startTime, endTime, currentPage, pageSize)
@@ -340,6 +348,7 @@ exports.getPayShopTotal = async (ctx) => {
   const userRole = await userdb.getUserRoles(username).then((res) => {
     return res;
   });
+  console.log(timenow + "用户" + username + "查询所有店铺对账表");
   if (userRole != "admin") {
     return (ctx.body = { status: -1, msg: "Sem permissão" });
   } else {

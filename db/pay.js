@@ -1,5 +1,5 @@
 const db = require("../db/index");
-
+const timenow = new Date();
 // 数据库PayFlow结构为payTotal,payDate,userID,payStatus,payObs
 // 新增支付流水，时间为当前时间，状态为0
 // 传入数据为payTotal,userID,payObs
@@ -14,12 +14,10 @@ async function addPayFlow(
   bankName,
   shopID
 ) {
-  console.log(payNum, "payNum2");
   const sql = `insert into PayFlow(payTotal,payDate,userID,payStatus,payObs,payNum,payClient,pix_path,payTotalReceved,recStatus,checkStatus,deleted,expDate,bankName,shopID) 
     values('${payTotal}',now(),'${userID}',1,'${payObs}','${payNum}','${payClient}','${pix_path}',0,0,0,0,DATE_ADD(NOW(), INTERVAL ${expiration} MINUTE), '${bankName}', '${shopID}')`;
   const result = await db(sql);
   if (result.affectedRows > 0) {
-    console.log(result.affectedRows, "数据库插入行数");
     return true;
   }
   return false;
@@ -37,7 +35,15 @@ async function checkPayNum(payNum) {
 
 // 更新支付流水状态
 async function updatePayStatus(pix_path, payStatus, payTotalReceved) {
-  // console.log(payNum,payStatus)
+  console.log(
+    timenow +
+      "订单号" +
+      pix_path +
+      "状态更新为" +
+      payStatus +
+      "实际收款" +
+      payTotalReceved
+  );
   const sql = `UPDATE PayFlow SET payStatus='${payStatus}', payTotalReceved='${payTotalReceved}', updateTime=NOW() WHERE pix_path='${pix_path}'`;
 
   // const sql = `update PayFlow set payStatus='${payStatus}' where payNum='${payNum}'`
@@ -106,10 +112,6 @@ async function getPayList(
   FROM PayFlow
   ${conditions}
 `;
-
-  // 打印 SQL 查询语句以进行调试
-  console.log("SQL Query:", sql);
-
   // 执行查询
   const [result, countResult] = await Promise.all([db(sql), db(countSql)]);
   const totalCount = countResult[0].total;
