@@ -86,7 +86,7 @@ async function getPayList(
   }
 
   // 追加固定条件: PayFlow.payStatus = 0
-  conditions += `AND PayFlow.payStatus = 0 `;
+  conditions += `AND PayFlow.deleted = 0 `;
 
   // 构造SQL查询语句，LEFT JOIN 时获取 User.shopID
   const sql = `
