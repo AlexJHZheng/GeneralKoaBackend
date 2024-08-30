@@ -25,20 +25,24 @@ exports.webhookReceve = async (ctx) => {
 exports.webhookBB = async (ctx) => {
   // 打印请求信息
   const timenow = new Date();
+  const body = ctx.request.body.pix;
   console.log(
     timenow +
       "收到银行回复订单号" +
-      ctx.request.body.pix[0].txid +
-      "，金额" +
-      ctx.request.body.pix[0].valor +
-      "收款成功"
+      body[0].txid +
+      "，应收金额" +
+      body[0].componentesValor.original.valor +
+      "实际收款" +
+      body[0].valor +
+      "成功"
   );
   // 打印请求头
   // console.log(ctx.request.header, "请求头");
-  const body = ctx.request.body.pix;
+  // const body = ctx.request.body.pix;
   const good = 0;
   const bad = 0;
   //写个for循环遍历body
+  console.log("body长度" + body.length);
   for (i = 0; i < body.length; i++) {
     const pix_path = body[i].txid;
     const valor = body[i].componentesValor.original.valor;
@@ -47,9 +51,8 @@ exports.webhookBB = async (ctx) => {
       console.log("金额不一致");
       bad++;
     } else {
-      paydb.updatePayStatus(pix_path, 1, received);
+      paydb.updatePayStatus(pix_path, 0, received);
       good++;
-      // return (ctx.body = { status: 200, msg: "ok" });
     }
   }
   console.log("成功更新" + good + "条数据" + "，失败" + bad + "条数据");
