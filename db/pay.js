@@ -248,7 +248,7 @@ async function getPayShopTotal(startTime, endTime) {
 
   // 构建通过 UserID 聚合的SQL查询，计算每个用户的总金额并显示 summary
   let sql = `
-  SELECT PayFlow.shopID, User.shopID, User.summary, SUM(PayFlow.payTotal) AS totalAmount
+  SELECT PayFlow.shopID, User.shopID, User.summary, SUM(PayFlow.payTotal) AS totalAmount ,COUNT(*) AS itemCount
   FROM PayFlow
   LEFT JOIN User ON PayFlow.userID = User.ID
   ${conditions}
