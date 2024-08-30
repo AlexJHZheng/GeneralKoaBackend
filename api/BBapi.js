@@ -159,7 +159,7 @@ exports.getPayStatus = async (pix_path) => {
       // 返回标准形式 创建时间，过期时间，金额，银行id，状态，pix码，银行名称
       // create_time,expiration,valor,bankId,status,pixCopiaECola，bankName
       if (response.data.status === "CONCLUIDA") {
-        return { status: 1 };
+        return { status: 1, payTotal: response.data.pix[0].valor };
       } else {
         return {
           status: 0,
