@@ -24,9 +24,17 @@ exports.webhookReceve = async (ctx) => {
 // webhook BB 巴西银行
 exports.webhookBB = async (ctx) => {
   // 打印请求信息
-  console.log(ctx.request.body, "请求内容");
+  const timenow = new Date();
+  console.log(
+    timenow +
+      "收到银行回复订单号" +
+      ctx.request.body.pix[0].txid +
+      "，金额" +
+      ctx.request.body.pix[0].valor +
+      "收款成功"
+  );
   // 打印请求头
-  console.log(ctx.request.header, "请求头");
+  // console.log(ctx.request.header, "请求头");
   const body = ctx.request.body.pix;
   const good = 0;
   const bad = 0;
