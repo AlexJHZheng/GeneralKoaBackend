@@ -45,7 +45,7 @@ API_BBbankName=
 ## 项目启动
 
 -默认端口为 8609 -运行 app.js 文件
-`node app.js` -访问接口 http://localhost:8609/api -外网 http://201.93.162.198:8609/api
+`node app.js` -访问接口 http://localhost:8609/api 
 
 ## 本地测试
 
